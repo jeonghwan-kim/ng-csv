@@ -83,18 +83,41 @@ angular.module('ngCsv.directives').
         }
       ],
       link: function (scope, element, attrs) {
+        function isSafari() {
+          return (/Version\/[\d\.]+.*Safari/).test(window.navigator.userAgent);
+        }
+
         function doClick() {
           var charset = scope.charset || "utf-8";
           var blob = new Blob([scope.csv], {
             type: "text/csv;charset="+ charset + ";"
           });
+          var downloadContainer,
+              downloadLink;
+
 
           if (window.navigator.msSaveOrOpenBlob) {
             navigator.msSaveBlob(blob, scope.getFilename());
-          } else {
+          } else if (isSafari()) {
+            downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
+            downloadLink = angular.element(downloadContainer.children()[0]);
 
-            var downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
-            var downloadLink = angular.element(downloadContainer.children()[0]);
+            // Safari doesn't allow downloading of blob urls
+            var reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = function() {
+              var base64data = reader.result;
+              downloadLink.attr('href', 'data:attachment/file' + base64data.slice(base64data.search(/[,;]/)));
+            };
+
+            $document.find('body').append(downloadContainer);
+            $timeout(function () {
+              downloadLink[0].click();
+              downloadLink.remove();
+            }, null);
+          } else {
+            downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
+            downloadLink = angular.element(downloadContainer.children()[0]);
             downloadLink.attr('href', window.URL.createObjectURL(blob));
             downloadLink.attr('download', scope.getFilename());
             downloadLink.attr('target', '_blank');
